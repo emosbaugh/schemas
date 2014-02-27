@@ -6,9 +6,6 @@ from functions import (MarshallingError, first, identity, is_seq, last, merge,
                        walk_keys)
 
 
-__version__ = "0.2.0"
-
-
 def required_key():
     return None
 

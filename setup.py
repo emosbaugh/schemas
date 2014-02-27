@@ -1,13 +1,16 @@
 from setuptools import setup
-import schemas
+
+
+__version__ = "0.2.1"
+
 
 setup(name='schemas',
-      version=schemas.__version__,
+      version=__version__,
       description='Python library for marshalling and validation',
       author='Charles Reese',
       author_email='charlespreese@gmail.com',
       url='https://github.com/creese/schemas',
-      download_url=('https://github.com/creese/schemas/archive/' +
-                    schemas.__version__ + '.zip'),
+      download_url=(
+          'https://github.com/creese/schemas/archive/' + __version__ + '.zip'),
       packages=['schemas'],
-      install_requires=['functions==0.2.0'],)
+      install_requires=['functions==0.2.1'],)
