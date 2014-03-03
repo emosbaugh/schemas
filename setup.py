@@ -1,7 +1,7 @@
 from setuptools import setup
 
 
-__version__ = "0.2.1"
+__version__ = "0.3.0"
 
 
 setup(name='schemas',
@@ -13,4 +13,4 @@ setup(name='schemas',
       download_url=(
           'https://github.com/creese/schemas/archive/' + __version__ + '.zip'),
       packages=['schemas'],
-      install_requires=['functions==0.2.1'],)
+      install_requires=['functions==0.3.0'],)
