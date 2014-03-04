@@ -39,7 +39,7 @@ def is_string(x):
 
 
 def is_match(pattern):
-    return lambda text: re.search(pattern, text).group()
+    return lambda text: re.search(pattern, text)
 
 
 def required_key():
