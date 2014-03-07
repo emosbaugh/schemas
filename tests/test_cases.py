@@ -1,7 +1,7 @@
 from functools import partial
 import operator as op
 
-from functions import identity
+from functions import identity, walk
 import pytest
 import simplejson as json
 
@@ -74,26 +74,26 @@ def letters(n):
 
 def test_walk_data_is_object():
     expects = gen_obj(*map(hex, range(6)))
-    assert s.walk(hexlify, identity, gen_obj(*range(6))) == expects
+    assert walk(hexlify, identity, gen_obj(*range(6))) == expects
 
 
 def test_walk_data_is_array():
     data = gen_obj(*range(12))
-    assert s.walk(hexlify, identity, data) == gen_obj(*map(hex, range(12)))
+    assert walk(hexlify, identity, data) == gen_obj(*map(hex, range(12)))
 
 
 def test_walk_with_outer_func_data_is_object():
     data = gen_obj(*range(6))
-    assert s.walk(hexlify, json.dumps, data) == json.dumps(gen_obj(*map(hex, range(6))))
+    assert walk(hexlify, json.dumps, data) == json.dumps(gen_obj(*map(hex, range(6))))
 
 
 def test_walk_with_outer_func_data_is_array():
     data = gen_obj(*range(12))
-    assert s.walk(hexlify, json.dumps, data) == json.dumps(gen_obj(*map(hex, range(12))))
+    assert walk(hexlify, json.dumps, data) == json.dumps(gen_obj(*map(hex, range(12))))
 
 
 def test_walk_filter_range_data_is_object():
-    assert s.walk(is_between_three_and_nine, identity, gen_obj(*range(4))) == {}
+    assert walk(is_between_three_and_nine, identity, gen_obj(*range(4))) == {}
 
 
 def test_walk_filter_range_data_is_array():
@@ -102,7 +102,7 @@ def test_walk_filter_range_data_is_array():
                {'a': {'b': '0x6',
                       'c': '0x7'},
                 'd': ({'e': '0x8'},)})
-    assert s.walk(is_between_three_and_nine, identity, gen_obj(*range(12))) == expects
+    assert walk(is_between_three_and_nine, identity, gen_obj(*range(12))) == expects
 
 
 def test_walk_pair_data_is_object():

@@ -4,7 +4,7 @@ import numbers
 import operator as op
 import re
 
-from functions import first, identity, is_seq, last, merge
+from functions import first, identity, is_seq, last, merge, walk
 
 
 eq = lambda val: partial(op.eq, val)
@@ -32,25 +32,6 @@ class MarshallingError(Exception):
     pass
 
 
-def walk(inner, outer, data):
-    """Traverse an arbitrary data structure and apply a function to each node."""
-    def process_node(inner, k, v):
-        if not isinstance(v, collections.Iterable) or isinstance(v, basestring):
-            return inner(k, v)
-        if isinstance(v, collections.Sequence):
-            rows = tuple(walk(inner, identity, row) for row in v)
-            rv = tuple(filter(lambda row: row, rows))
-        else:
-            rv = walk(inner, identity, v)
-        return (k, rv) if rv else None
-    if isinstance(data, collections.Sequence):
-        return outer(tuple(walk(inner, identity, row) for row in data))
-    nodes = ()
-    for (k, v) in data.iteritems():
-        nodes += (process_node(inner, k, v),)
-    return outer(dict(filter(lambda node: node is not None, nodes)))
-
-
 def walk_pair(inner, outer, data, schema, handler):
     """ Traverse a pair of data structures and apply a function to each node. """
     def process_node(inner, k, v1, v2):
@@ -72,8 +53,15 @@ def walk_pair(inner, outer, data, schema, handler):
     nodes = ()
     for (k, v) in data.iteritems():
         if k not in schema:
-            handler(k)
-            nodes += ()
+            if isinstance(k, collections.Sequence) and not isinstance(k, basestring):
+                if not set(k).intersection(set(schema)):
+                    handler(k)
+                    nodes += ()
+                else:
+                    nodes += (process_node(inner, k, v, schema[last(k)]),)
+            else:
+                handler(k)
+                nodes += ()
         else:
             nodes += (process_node(inner, k, v, schema[k]),)
     return outer(dict(filter(lambda node: node is not None, nodes)))
@@ -106,6 +94,7 @@ def validate(data, schema):
         return (k, v)
 
     def handler(k):
+
         if is_seq(k):
             type_, key = k
         else:
