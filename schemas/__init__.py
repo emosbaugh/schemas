@@ -1,94 +1,125 @@
+import collections
 from functools import partial, wraps
 import numbers
 import operator as op
 import re
 
-from functions import first, identity, is_seq, last, merge, walk
+from functions import first, identity, is_seq, last, merge
+
+
+eq = lambda val: partial(op.eq, val)
+
+identical = lambda val: partial(op.is_, val)
+
+number = lambda x: isinstance(x, numbers.Number)
+
+pos = lambda x: True if number(x) and x > 0 else False
+
+string = lambda x: isinstance(x, str)
+
+match = lambda pattern: lambda text: re.search(pattern, text)
+
+subset = lambda set_: partial(op.contains, set_)
+
+any = lambda x: x
+
+optional_key = lambda x: x
+
+required_key = lambda x: x
 
 
 class MarshallingError(Exception):
     pass
 
 
-def eq(x):
-    return partial(op.eq, x)
+def walk(inner, outer, data):
+    """Traverse an arbitrary data structure and apply a function to each node."""
+    def process_node(inner, k, v):
+        if not isinstance(v, collections.Iterable) or isinstance(v, basestring):
+            return inner(k, v)
+        if isinstance(v, collections.Sequence):
+            rows = tuple(walk(inner, identity, row) for row in v)
+            rv = tuple(filter(lambda row: row, rows))
+        else:
+            rv = walk(inner, identity, v)
+        return (k, rv) if rv else None
+    if isinstance(data, collections.Sequence):
+        return outer(tuple(walk(inner, identity, row) for row in data))
+    nodes = ()
+    for (k, v) in data.iteritems():
+        nodes += (process_node(inner, k, v),)
+    return outer(dict(filter(lambda node: node is not None, nodes)))
 
 
-def is_identical(x):
-    return partial(op.is_, x)
+def walk_pair(inner, outer, data, schema, handler):
+    """ Traverse a pair of data structures and apply a function to each node. """
+    def process_node(inner, k, v1, v2):
+        if not isinstance(v1, collections.Iterable) or isinstance(v1, basestring):
+            return inner(k, v1, v2)
+        if isinstance(v1, collections.Sequence):
+            rows = tuple(walk_pair(inner, identity, row, v2, handler) for row in v1)
+            rv = tuple(filter(lambda row: row, rows))
+        else:
+            rv = walk_pair(inner, identity, v1, v2, handler)
+        return (k, rv) if rv else None
+    if isinstance(data, collections.Sequence):
+        if isinstance(schema, collections.Sequence):
+            schema_row = first(schema)
+        else:
+            schema_row = schema
+        return outer(tuple(walk_pair(inner, identity, row, schema_row, handler)
+                           for row in data))
+    nodes = ()
+    for (k, v) in data.iteritems():
+        if k not in schema:
+            handler(k)
+            nodes += ()
+        else:
+            nodes += (process_node(inner, k, v, schema[k]),)
+    return outer(dict(filter(lambda node: node is not None, nodes)))
 
 
-def not_(x):
-    return partial(op.not_, x)
-
-
-def is_number(x):
-    return isinstance(x, numbers.Number)
-
-
-def is_pos(x):
-    return True if is_number(x) and x > 0 else False
-
-
-def is_subset(x):
-    return partial(op.contains, x)
-
-
-def is_string(x):
-    return isinstance(x, str)
-
-
-def is_match(pattern):
-    return lambda text: re.search(pattern, text)
-
-
-def required_key():
-    return None
-
-
-def optional_key():
-    return None
-
-
-def strip_metadata(schema):
-    def process_node(k, v):
+def sanitize_keys(schema):
+    def sanitize_key(k, v):
         if is_seq(k):
             return (last(k), v)
         return (k, v)
-    return walk(process_node, identity, schema)
+    return walk(sanitize_key, identity, schema)
 
 
 def sanitize(data, schema):
-    def process_node(schema, k, v):
-        if k in schema:
-            if schema[k](v) or schema[k] == identity:
-                return (k, v)
-            else:
-                print "Schema violation for key '{0}' and value '{1}'".format(k, v)
+    def sanitize_node(k, v, validator):
+        if validator(v) or validator == any:
+            return (k, v)
         else:
-            print "Cannot validate '{0}', key not in schema".format(k)
+            print "Schema violation for key '{0}' and value '{1}'".format(k, v)
+            return None
+
+    def handler(k):
+        print "Cannot validate '{0}', key not in schema".format(k)
         return None
-    return walk(partial(process_node, strip_metadata(schema)), identity, data)
+    return walk_pair(sanitize_node, identity, data, sanitize_keys(schema), handler)
 
 
 def validate(data, schema):
-    def is_missing(data, k, v):
+    def identity3(k, v, validator):
+        return (k, v)
+
+    def handler(k):
         if is_seq(k):
             type_, key = k
         else:
             type_, key = optional_key, k
-        if key not in data and type_ == required_key:
-            return (key, None)
+        if type_ == required_key:
+            raise MarshallingError("Field missing: {0}".format(key))
         return None
     sanitized_data = sanitize(data, schema)
-    omitted = walk(partial(is_missing, sanitized_data), identity, schema)
-    if omitted:
-        raise MarshallingError("Fields missing: " + ", ".join(omitted.keys()))
+    walk_pair(identity3, identity, schema, sanitized_data, handler)
     return sanitized_data
 
 
 def validate_with(schema):
-    """Validate function arguments and check for required fields."""
+    """Validate function arguments and check required fields."""
     def decorator(f):
         @wraps(f)
         def wrapper(data, *args, **kwargs):
@@ -98,20 +129,21 @@ def validate_with(schema):
 
 
 def marshal(data, schema, before=False):
-    def process_node(schema, k, v, before=False):
+    def marshal_node(k, v1, v2, before=False):
+        if not is_seq(v2):
+            func = identity
+        else:
+            func = first if before else last
         try:
-            if not isinstance(schema[k], (list, tuple)):
-                func = identity
-            else:
-                func = first if before else last
-            try:
-                return (k, func(schema[k])(v))
-            except TypeError:
-                raise MarshallingError(
-                    "Cannot process node for key '{0}' and value '{1}'".format(k, v))
-        except KeyError:
-            return None
-    return walk(partial(process_node, schema, before=before), identity, data)
+            return (k, func(v2)(v1))
+        except (TypeError, ZeroDivisionError):
+            raise MarshallingError(
+                "Cannot process node for key '{0}' and value '{1}'".format(k, v1))
+
+    def handler(k):
+        return None
+    return walk_pair(partial(marshal_node, before=before), identity, data, schema,
+                     handler)
 
 
 def marshal_with(schema):
@@ -132,9 +164,13 @@ def marshal_with(schema):
 
 
 def satisfies(data, schema):
-    def process_node(schema, k, v):
-        if schema[k].__class__ == partial and schema[k].func == op.eq:
-            assert first(schema[k].args) == v
+    def assert_at_node(k, v, validator):
+        if validator.__class__ == partial and validator.func == op.eq:
+            assert v == first(validator.args)
         else:
-            assert schema[k](v)
-    return walk(partial(process_node, schema), identity, data)
+            assert validator(v)
+        return None
+
+    def handler(k):
+        raise AssertionError("Cannot validate '{0}', key not in schema".format(k))
+    return walk_pair(assert_at_node, identity, data, schema, handler)
