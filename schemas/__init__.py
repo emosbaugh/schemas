@@ -8,23 +8,14 @@ from functions import first, identity, is_seq, last, merge, walk
 
 
 eq = lambda val: partial(op.eq, val)
-
 identical = lambda val: partial(op.is_, val)
-
 number = lambda x: isinstance(x, numbers.Number)
-
 pos = lambda x: True if number(x) and x > 0 else False
-
 string = lambda x: isinstance(x, str)
-
 match = lambda pattern: lambda text: re.search(pattern, text)
-
 subset = lambda set_: partial(op.contains, set_)
-
 any = lambda x: x
-
 optional_key = lambda x: x
-
 required_key = lambda x: x
 
 
@@ -94,7 +85,6 @@ def validate(data, schema):
         return (k, v)
 
     def handler(k):
-
         if is_seq(k):
             type_, key = k
         else:
@@ -130,6 +120,7 @@ def marshal(data, schema, before=False):
                 "Cannot process node for key '{0}' and value '{1}'".format(k, v1))
 
     def handler(k):
+        print "Cannot process '{0}', key not in schema".format(k)
         return None
     return walk_pair(partial(marshal_node, before=before), identity, data, schema,
                      handler)
@@ -152,14 +143,15 @@ def marshal_with(schema):
     return decorator
 
 
-def satisfies(data, schema):
-    def assert_at_node(k, v, validator):
-        if validator.__class__ == partial and validator.func == op.eq:
-            assert v == first(validator.args)
-        else:
-            assert validator(v)
-        return None
+# this doesn't work'
+# def satisfies(schema, data):
+#     def assert_at_node(k, validator, v):
+#         if validator.__class__ == partial and validator.func == op.eq:
+#             assert v == first(validator.args)
+#         else:
+#             assert validator(v)
+#         return None
 
-    def handler(k):
-        raise AssertionError("Cannot validate '{0}', key not in schema".format(k))
-    return walk_pair(assert_at_node, identity, data, schema, handler)
+#     def handler(k):
+#         raise AssertionError("Cannot validate '{0}', key not in data".format(k))
+#     return walk_pair(assert_at_node, identity, data, sanitize_keys(schema), handler)
