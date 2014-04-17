@@ -9,6 +9,7 @@ from functions import first, identity, is_seq, last, merge, walk
 
 eq = lambda val: partial(op.eq, val)
 identical = lambda val: partial(op.is_, val)
+bool = lambda x: isinstance(x, bool)
 number = lambda x: isinstance(x, numbers.Number)
 pos = lambda x: True if number(x) and x > 0 else False
 string = lambda x: isinstance(x, str)
@@ -109,6 +110,8 @@ def validate_with(schema):
 
 def marshal(data, schema, before=False):
     def marshal_node(k, v1, v2, before=False):
+        if isinstance(v2, dict) and v1 is None:
+            return (k, None)
         if not is_seq(v2):
             func = identity
         else:
