@@ -9,7 +9,7 @@ from functions import first, identity, is_seq, last, merge, walk
 
 eq = lambda val: partial(op.eq, val)
 identical = lambda val: partial(op.is_, val)
-bool = lambda x: isinstance(x, bool)
+boolean = lambda x: isinstance(x, bool)
 number = lambda x: isinstance(x, numbers.Number)
 pos = lambda x: True if number(x) and x > 0 else False
 string = lambda x: isinstance(x, str)
