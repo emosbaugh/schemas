@@ -27,7 +27,11 @@ class MarshallingError(Exception):
 def walk_pair(inner, outer, data, schema, handler):
     """ Traverse a pair of data structures and apply a function to each node. """
     def process_node(inner, k, v1, v2):
-        if not isinstance(v1, collections.Iterable) or isinstance(v1, basestring):
+        if (not isinstance(v1, collections.Iterable)
+            or isinstance(v1, basestring)
+            or ((isinstance(v1, collections.Sequence)
+                 and not isinstance(k, basestring)
+                 and hasattr(v2, '__call__')))):
             return inner(k, v1, v2)
         if isinstance(v1, collections.Sequence):
             rows = tuple(walk_pair(inner, identity, row, v2, handler) for row in v1)
