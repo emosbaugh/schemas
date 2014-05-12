@@ -30,7 +30,7 @@ def walk_pair(inner, outer, data, schema, handler):
         if (not isinstance(v1, collections.Iterable)
             or isinstance(v1, basestring)
             or ((isinstance(v1, collections.Sequence)
-                 and not isinstance(k, basestring)
+                 and not isinstance(v1, basestring)
                  and hasattr(v2, '__call__')))):
             return inner(k, v1, v2)
         if isinstance(v1, collections.Sequence):
